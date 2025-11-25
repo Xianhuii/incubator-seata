@@ -87,24 +87,28 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
     private static final String DEFAULT_GLOBAL_TX_NAME = "default";
 
     /**
+     * 与TC服务交互的客户端
      * The transaction manager instance used for communicating with TC server.
      * This is obtained from {@link org.apache.seata.tm.TransactionManagerHolder} during construction.
      */
     private TransactionManager transactionManager;
 
     /**
+     * 全局事务id，在begin时由TC分配
      * Global transaction identifier (XID).
      * This is assigned by TC server when the transaction begins.
      */
     private String xid;
 
     /**
+     * 全局事务状态
      * Current status of the global transaction.
      * @see GlobalStatus
      */
     private GlobalStatus status;
 
     /**
+     * 当前事务实例的角色（不同角色控制全局事务生命周期的能力不同）
      * Role of this transaction instance.
      * Determines whether this instance can control the transaction lifecycle.
      * @see GlobalTransactionRole
@@ -112,6 +116,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
     private GlobalTransactionRole role;
 
     /**
+     * 当前事务实例的创建时间，用于超时和监控
      * Timestamp when this transaction was created.
      * Used to calculate timeout and for monitoring purposes.
      *
@@ -120,6 +125,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
     private long createTime;
 
     /**
+     * commit的重试次数
      * Maximum number of retry attempts for commit operations.
      * Configurable via {@link ConfigurationKeys#CLIENT_TM_COMMIT_RETRY_COUNT}.
      */
@@ -127,6 +133,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             .getInt(ConfigurationKeys.CLIENT_TM_COMMIT_RETRY_COUNT, DEFAULT_TM_COMMIT_RETRY_COUNT);
 
     /**
+     * rollback的重试次数
      * Maximum number of retry attempts for rollback operations.
      * Configurable via {@link ConfigurationKeys#CLIENT_TM_ROLLBACK_RETRY_COUNT}.
      */
@@ -175,6 +182,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
     }
 
     /**
+     * begin全局事务
      * Begins a new global transaction with default timeout and name.
      *
      * <p>This method uses:</p>
@@ -236,6 +244,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
         this.createTime = System.currentTimeMillis();
 
         // Participants don't initiate transactions, they just join existing ones
+        // 参与者没有权限begin，直接返回
         if (role != GlobalTransactionRole.Launcher) {
             assertXIDNotNull();
             if (LOGGER.isDebugEnabled()) {
@@ -245,17 +254,18 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
         }
 
         // Ensure this is a clean transaction start
-        assertXIDNull();
-        String currentXid = RootContext.getXID();
+        assertXIDNull(); // begin前，xid为null
+        String currentXid = RootContext.getXID(); // begin前，当前线程不能绑定xid
         if (currentXid != null) {
             throw new IllegalStateException("Global transaction already exists,"
                     + " can't begin a new global transaction, currentXid = " + currentXid);
         }
 
         // Request XID from TC server and bind to thread context
+        // 请求TC服务器的begin接口，生成xid
         xid = transactionManager.begin(null, null, name, timeout);
-        status = GlobalStatus.Begin;
-        RootContext.bind(xid);
+        status = GlobalStatus.Begin; // 更新状态为begin
+        RootContext.bind(xid); // 将xid绑定到当前线程
 
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("Begin new global transaction [{}]", xid);
@@ -299,6 +309,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
     @Override
     public void commit() throws TransactionException {
         // Only Launchers can commit global transactions
+        // 参与者没有权限commit，直接返回
         if (role == GlobalTransactionRole.Participant) {
             // Participant has no responsibility of committing
             if (LOGGER.isDebugEnabled()) {
@@ -307,12 +318,13 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             return;
         }
 
-        assertXIDNotNull();
+        assertXIDNotNull(); // commit时，xid不为null
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("transaction {} will be commit", xid);
         }
 
         // Determine retry count (use configured value or default)
+        // 重试请求TC服务器的commit接口，返回状态
         int retry = COMMIT_RETRY_COUNT <= 0 ? DEFAULT_TM_COMMIT_RETRY_COUNT : COMMIT_RETRY_COUNT;
         try {
             // Retry loop for commit operation
@@ -334,6 +346,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             }
         } finally {
             // Clean up transaction context if this is the bound transaction
+            // 清除当前事务
             if (xid.equals(RootContext.getXID())) {
                 suspend(true);
             }
@@ -386,6 +399,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
     @Override
     public void rollback() throws TransactionException {
         // Only Launchers can rollback global transactions
+        // 如果时参与者，没有权限rollback，直接返回
         if (role == GlobalTransactionRole.Participant) {
             // Participant has no responsibility of rollback
             if (LOGGER.isDebugEnabled()) {
@@ -394,12 +408,13 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             return;
         }
 
-        assertXIDNotNull();
+        assertXIDNotNull(); // rollback时，xid不能为null
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("transaction {} will be rollback", xid);
         }
 
         // Determine retry count (use configured value or default)
+        // 重试请求TC服务器的rollback接口，返回状态
         int retry = ROLLBACK_RETRY_COUNT <= 0 ? DEFAULT_TM_ROLLBACK_RETRY_COUNT : ROLLBACK_RETRY_COUNT;
         try {
             // Retry loop for rollback operation
@@ -421,6 +436,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             }
         } finally {
             // Clean up transaction context if this is the bound transaction
+            // 清除当前事务
             if (xid.equals(RootContext.getXID())) {
                 suspend(true);
             }
@@ -501,7 +517,9 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
                     LOGGER.info("suspending current transaction, xid = {}", xid);
                 }
             }
+            // 当前线程解绑xid
             RootContext.unbind();
+            // 判断是否暂存xid
             return clean ? null : new SuspendedResourcesHolder(xid);
         } else {
             return null;
@@ -513,6 +531,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
         if (suspendedResourcesHolder == null) {
             return;
         }
+        // 恢复当前线程的事务，重新绑定xid
         String xid = suspendedResourcesHolder.getXid();
         RootContext.bind(xid);
         if (LOGGER.isDebugEnabled()) {
@@ -542,6 +561,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             throw new IllegalStateException();
         }
 
+        // 请求TC服务器的globalReport接口，上报参与者的最新状态
         status = transactionManager.globalReport(xid, globalStatus);
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("[{}] report status: {}", xid, status);

@@ -21,6 +21,8 @@ import org.apache.seata.core.exception.TransactionException;
 import org.apache.seata.core.model.GlobalStatus;
 
 /**
+ * 管理GlobalTransaction的工厂
+ * <p>
  * Factory and utility class for managing GlobalTransaction instances.
  *
  * <p>Provides static factory methods to create, retrieve, and manage global transaction
