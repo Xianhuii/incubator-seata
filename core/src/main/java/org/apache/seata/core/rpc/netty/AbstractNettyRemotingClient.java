@@ -159,12 +159,15 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
 
     @Override
     public Object sendSyncRequest(Object msg) throws TimeoutException {
+        // 负载均衡
         String serverAddress = loadBalance(getTransactionServiceGroup(), msg);
         long timeoutMillis = this.getRpcRequestTimeout();
+        // 创建rpc请求参数
         RpcMessage rpcMessage = buildRequestMessage(msg, ProtocolConstants.MSGTYPE_RESQUEST_SYNC);
 
         // send batch message
         // put message into basketMap, @see MergedSendRunnable
+        // 批量请求
         if (this.isEnableClientBatchSendRequest()) {
 
             // send batch message is sync request, needs to create messageFuture and put it in futures.
@@ -210,7 +213,9 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
                     throw new RuntimeException(exx);
                 }
             }
-        } else {
+        }
+        // 单次请求
+        else {
             Channel channel = clientChannelManager.acquireChannel(serverAddress);
             return super.sendSync(channel, rpcMessage, timeoutMillis);
         }

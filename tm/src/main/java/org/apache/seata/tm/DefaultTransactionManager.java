@@ -84,46 +84,61 @@ public class DefaultTransactionManager implements TransactionManager {
     @Override
     public String begin(String applicationId, String transactionServiceGroup, String name, int timeout)
             throws TransactionException {
+        // 创建请求参数
         GlobalBeginRequest request = new GlobalBeginRequest();
         request.setTransactionName(name);
         request.setTimeout(timeout);
+        // 同步请求
         GlobalBeginResponse response = (GlobalBeginResponse) syncCall(request);
         if (response.getResultCode() == ResultCode.Failed) {
             throw new TmTransactionException(TransactionExceptionCode.BeginFailed, response.getMsg());
         }
+        // 获取响应的xid
         return response.getXid();
     }
 
     @Override
     public GlobalStatus commit(String xid) throws TransactionException {
+        // 创建请求参数
         GlobalCommitRequest globalCommit = new GlobalCommitRequest();
         globalCommit.setXid(xid);
+        // 同步请求
         GlobalCommitResponse response = (GlobalCommitResponse) syncCall(globalCommit);
+        // 获取响应的status
         return response.getGlobalStatus();
     }
 
     @Override
     public GlobalStatus rollback(String xid) throws TransactionException {
+        // 创建请求参数
         GlobalRollbackRequest globalRollback = new GlobalRollbackRequest();
         globalRollback.setXid(xid);
+        // 同步请求
         GlobalRollbackResponse response = (GlobalRollbackResponse) syncCall(globalRollback);
+        // 获取响应的status
         return response.getGlobalStatus();
     }
 
     @Override
     public GlobalStatus getStatus(String xid) throws TransactionException {
+        // 创建请求参数
         GlobalStatusRequest queryGlobalStatus = new GlobalStatusRequest();
         queryGlobalStatus.setXid(xid);
+        // 同步请求
         GlobalStatusResponse response = (GlobalStatusResponse) syncCall(queryGlobalStatus);
+        // 获取响应的status
         return response.getGlobalStatus();
     }
 
     @Override
     public GlobalStatus globalReport(String xid, GlobalStatus globalStatus) throws TransactionException {
+        // 创建请求参数
         GlobalReportRequest globalReport = new GlobalReportRequest();
         globalReport.setXid(xid);
         globalReport.setGlobalStatus(globalStatus);
+        // 同步请求
         GlobalReportResponse response = (GlobalReportResponse) syncCall(globalReport);
+        // 获取响应的status
         return response.getGlobalStatus();
     }
 
