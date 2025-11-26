@@ -36,6 +36,8 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 /**
+ * 事务执行模版，通过策略模式实现具体的事务模式（AT、TCC、Saga等）
+ * <p>
  * Template class for executing business logic within a global transaction context.
  *
  * <p>This class implements the Template Method pattern to provide a standardized
@@ -180,15 +182,16 @@ public class TransactionalTemplate {
      * @see org.apache.seata.tm.api.transaction.Propagation
      */
     public Object execute(TransactionalExecutor business) throws Throwable {
-        // 1. Get transactionInfo
+        // 1. Get transactionInfo 获取用户输入的事务配置信息，用来指定接下来的事务要以什么方式执行
         TransactionInfo txInfo = business.getTransactionInfo();
         if (txInfo == null) {
             throw new ShouldNeverHappenException("transactionInfo does not exist");
         }
         // 1.1 Get current transaction, if not null, the tx role is 'GlobalTransactionRole.Participant'.
+        // 创建事务，作为参与者
         GlobalTransaction tx = GlobalTransactionContext.getCurrent();
 
-        // 1.2 Handle the transaction propagation.
+        // 1.2 Handle the transaction propagation. 处理事务传播
         Propagation propagation = txInfo.getPropagation();
         SuspendedResourcesHolder suspendedResourcesHolder = null;
         try {
@@ -241,7 +244,7 @@ public class TransactionalTemplate {
                     throw new TransactionException("Not Supported Propagation:" + propagation);
             }
 
-            // set current tx config to holder
+            // set current tx config to holder 将事务配置绑定到线程，暂存之前的配置
             GlobalLockConfig previousConfig = replaceGlobalLockConfig(txInfo);
 
             if (tx.getGlobalTransactionRole() == GlobalTransactionRole.Participant) {
@@ -251,30 +254,31 @@ public class TransactionalTemplate {
             try {
                 // 2. If the tx role is 'GlobalTransactionRole.Launcher', send the request of beginTransaction to TC,
                 //    else do nothing. Of course, the hooks will still be triggered.
+                // 开始事务
                 beginTransaction(txInfo, tx);
 
                 Object rs;
                 try {
-                    // Do Your Business
+                    // Do Your Business 执行业务
                     rs = business.execute();
                 } catch (Throwable ex) {
-                    // 3. The needed business exception to rollback.
+                    // 3. The needed business exception to rollback. 回滚事务
                     completeTransactionAfterThrowing(txInfo, tx, ex);
                     throw ex;
                 }
 
-                // 4. everything is fine, commit.
+                // 4. everything is fine, commit. 提交事务
                 commitTransaction(tx, txInfo);
 
                 return rs;
             } finally {
-                // 5. clear
+                // 5. clear 清除事务
                 resumeGlobalLockConfig(previousConfig);
                 triggerAfterCompletion(tx);
                 cleanUp(tx);
             }
         } finally {
-            // If the transaction is suspended, resume it.
+            // If the transaction is suspended, resume it. 恢复上个事务
             if (suspendedResourcesHolder != null) {
                 tx.resume(suspendedResourcesHolder);
             }
@@ -320,10 +324,12 @@ public class TransactionalTemplate {
     private void completeTransactionAfterThrowing(
             TransactionInfo txInfo, GlobalTransaction tx, Throwable originalException)
             throws TransactionalExecutor.ExecutionException, TransactionException {
-        // roll back
+        // roll back 如果配置了回滚Exception，执行回滚
         if (txInfo != null && txInfo.rollbackOn(originalException)) {
             rollbackTransaction(tx, originalException);
-        } else {
+        }
+        // 否则，提交事务
+        else {
             // not roll back on this exception, so commit
             commitTransaction(tx, txInfo);
         }
@@ -331,12 +337,14 @@ public class TransactionalTemplate {
 
     private void commitTransaction(GlobalTransaction tx, TransactionInfo txInfo)
             throws TransactionalExecutor.ExecutionException, TransactionException {
+        // 如果不是事务发起者，直接返回
         if (tx.getGlobalTransactionRole() != GlobalTransactionRole.Launcher) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Ignore commit: just involved in global transaction [{}]", tx.getXid());
             }
             return;
         }
+        // 如果事务已超时，触发回滚
         if (isTimeout(tx.getCreateTime(), txInfo)) {
             // business execution timeout
             Exception exx = new TmTransactionException(
@@ -349,7 +357,9 @@ public class TransactionalTemplate {
         }
 
         try {
+            // 提交前回调
             triggerBeforeCommit();
+            // 提交事务
             tx.commit();
             GlobalStatus afterCommitStatus = tx.getLocalStatus();
             TransactionalExecutor.Code code = TransactionalExecutor.Code.Unknown;
@@ -378,6 +388,7 @@ public class TransactionalTemplate {
             if (null != statusException) {
                 throw new TransactionalExecutor.ExecutionException(tx, statusException, code);
             }
+            // 提交后回调
             triggerAfterCommit();
         } catch (TransactionException txe) {
             // 4.1 Failed to commit
@@ -387,6 +398,7 @@ public class TransactionalTemplate {
 
     private void rollbackTransaction(GlobalTransaction tx, Throwable originalException)
             throws TransactionException, TransactionalExecutor.ExecutionException {
+        // 如果不是发起者，直接返回
         if (tx.getGlobalTransactionRole() != GlobalTransactionRole.Launcher) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Ignore rollback: just involved in global transaction [{}]", tx.getXid());
@@ -394,8 +406,11 @@ public class TransactionalTemplate {
             return;
         }
         try {
+            // 回滚前回调
             triggerBeforeRollback();
+            // 回滚
             tx.rollback();
+            // 回滚后回调
             triggerAfterRollback();
         } catch (TransactionException txe) {
             // Failed to rollback
@@ -432,6 +447,7 @@ public class TransactionalTemplate {
 
     private void beginTransaction(TransactionInfo txInfo, GlobalTransaction tx)
             throws TransactionalExecutor.ExecutionException {
+        // 如果不是事务发起者，直接返回
         if (tx.getGlobalTransactionRole() != GlobalTransactionRole.Launcher) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Ignore begin: just involved in global transaction [{}]", tx.getXid());
@@ -439,8 +455,11 @@ public class TransactionalTemplate {
             return;
         }
         try {
+            // 触发开始前回调
             triggerBeforeBegin();
+            // 开始事务
             tx.begin(txInfo.getTimeOut(), txInfo.getName());
+            // 触发开始事务后回调
             triggerAfterBegin();
         } catch (TransactionException txe) {
             throw new TransactionalExecutor.ExecutionException(tx, txe, TransactionalExecutor.Code.BeginFailure);

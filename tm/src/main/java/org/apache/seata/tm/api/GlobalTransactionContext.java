@@ -93,9 +93,11 @@ public class GlobalTransactionContext {
      */
     public static GlobalTransaction getCurrent() {
         String xid = RootContext.getXID();
+        // 如果xid为空，直接返回null，后续在事务传播中创建，作为发起者
         if (xid == null) {
             return null;
         }
+        // 如果xid不为空，作为参与者
         return new DefaultGlobalTransaction(xid, GlobalStatus.Begin, GlobalTransactionRole.Participant);
     }
 
