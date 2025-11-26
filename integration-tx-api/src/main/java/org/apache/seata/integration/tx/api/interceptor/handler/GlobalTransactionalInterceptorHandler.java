@@ -161,6 +161,7 @@ public class GlobalTransactionalInterceptorHandler extends AbstractProxyInvocati
                     } else {
                         transactional = this.aspectTransactional;
                     }
+                    // 处理全局事务
                     return handleGlobalTransaction(invocation, transactional);
                 } else if (globalLockAnnotation != null) {
                     return handleGlobalLock(invocation, globalLockAnnotation);
@@ -190,6 +191,9 @@ public class GlobalTransactionalInterceptorHandler extends AbstractProxyInvocati
         boolean succeed = true;
         try {
             return transactionalTemplate.execute(new TransactionalExecutor() {
+                /**
+                 * 执行业务，即业务方法
+                 */
                 @Override
                 public Object execute() throws Throwable {
                     return methodInvocation.proceed();
@@ -203,6 +207,9 @@ public class GlobalTransactionalInterceptorHandler extends AbstractProxyInvocati
                     return formatMethod(methodInvocation.getMethod());
                 }
 
+                /**
+                 * 根据注解创建当前事务的配置信息
+                 */
                 @Override
                 public TransactionInfo getTransactionInfo() {
                     // reset the value of timeout
