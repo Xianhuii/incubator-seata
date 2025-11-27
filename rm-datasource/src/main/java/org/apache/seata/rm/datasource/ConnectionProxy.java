@@ -181,6 +181,9 @@ public class ConnectionProxy extends AbstractConnectionProxy {
         context.appendLockKey(lockKey);
     }
 
+    /**
+     * 提交事务
+     */
     @Override
     public void commit() throws SQLException {
         try {
@@ -201,6 +204,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
     @Override
     public Savepoint setSavepoint() throws SQLException {
         Savepoint savepoint = targetConnection.setSavepoint();
+        // 保存savePoint
         context.appendSavepoint(savepoint);
         return savepoint;
     }
@@ -225,16 +229,22 @@ public class ConnectionProxy extends AbstractConnectionProxy {
     }
 
     private void doCommit() throws SQLException {
+        // 开启了全局事务
         if (context.inGlobalTransaction()) {
             processGlobalTransactionCommit();
-        } else if (context.isGlobalLockRequire()) {
+        }
+        // 开启了全局锁
+        else if (context.isGlobalLockRequire()) {
             processLocalCommitWithGlobalLocks();
-        } else {
+        }
+        // 普通本地事务
+        else {
             targetConnection.commit();
         }
     }
 
     private void processLocalCommitWithGlobalLocks() throws SQLException {
+        // 获取全局锁
         checkLock(context.buildLockKeys());
         try {
             targetConnection.commit();
@@ -246,19 +256,24 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
     private void processGlobalTransactionCommit() throws SQLException {
         try {
+            // 注册本地事务
             register();
         } catch (TransactionException e) {
             recognizeLockKeyConflictException(e, context.buildLockKeys());
         }
         try {
+            // 提交undoLog：插入本地数据库
             UndoLogManagerFactory.getUndoLogManager(this.getDbType()).flushUndoLogs(this);
+            // 提交本地事务
             targetConnection.commit();
         } catch (Throwable ex) {
             LOGGER.error("process connectionProxy commit error: {}", ex.getMessage(), ex);
+            // 调用资源管理器（RM）上报提交失败
             report(false);
             throw new SQLException(ex);
         }
         if (IS_REPORT_SUCCESS_ENABLE) {
+            // 调用资源管理器（RM）上报提交成功
             report(true);
         }
         context.reset();
@@ -269,6 +284,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
             return;
         }
 
+        // 调用资源管理器（RM）注册本地事务
         Long branchId = DefaultResourceManager.get()
                 .branchRegister(
                         BranchType.AT,
@@ -282,8 +298,10 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
     @Override
     public void rollback() throws SQLException {
+        // 回滚本地事务
         targetConnection.rollback();
         if (context.inGlobalTransaction() && context.isBranchRegistered()) {
+            // 调用资源管理器（RM）上报提交失败
             report(false);
         }
         context.reset();

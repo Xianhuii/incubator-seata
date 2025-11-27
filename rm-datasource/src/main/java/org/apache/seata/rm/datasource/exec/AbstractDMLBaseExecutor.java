@@ -96,9 +96,13 @@ public abstract class AbstractDMLBaseExecutor<T, S extends Statement> extends Ba
      */
     protected T executeAutoCommitFalse(Object[] args) throws Exception {
         try {
+            // 获取执行前数据镜像
             TableRecords beforeImage = beforeImage();
+            // 执行sql
             T result = statementCallback.execute(statementProxy.getTargetStatement(), args);
+            // 获取执行后数据镜像
             TableRecords afterImage = afterImage(beforeImage);
+            // 构造undoLog
             prepareUndoLog(beforeImage, afterImage);
             return result;
         } catch (TableMetaException e) {

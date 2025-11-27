@@ -122,12 +122,14 @@ public abstract class BaseTransactionalExecutor<T, S extends Statement> implemen
 
     @Override
     public T execute(Object... args) throws Throwable {
+        // 获取当前xid
         String xid = RootContext.getXID();
         if (xid != null) {
             statementProxy.getConnectionProxy().bind(xid);
         }
 
         statementProxy.getConnectionProxy().setGlobalLockRequire(RootContext.requireGlobalLock());
+        // 执行
         return doExecute(args);
     }
 

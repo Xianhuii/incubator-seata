@@ -41,6 +41,7 @@ import java.sql.Statement;
 import java.util.List;
 
 /**
+ * AT事务的执行SQL的模版
  * The type Execute template.
  *
  */
@@ -81,11 +82,13 @@ public class ExecuteTemplate {
             StatementCallback<T, S> statementCallback,
             Object... args)
             throws SQLException {
+        // 如果没有开启AT事务，直接执行原始statement
         if (!RootContext.requireGlobalLock() && BranchType.AT != RootContext.getBranchType()) {
             // Just work as original statement
             return statementCallback.execute(statementProxy.getTargetStatement(), args);
         }
 
+        // 根据不同sql获取对应执行器
         String dbType = statementProxy.getConnectionProxy().getDbType();
         if (CollectionUtils.isEmpty(sqlRecognizers)) {
             sqlRecognizers = SQLVisitorFactory.get(statementProxy.getTargetSQL(), dbType);
@@ -173,6 +176,7 @@ public class ExecuteTemplate {
         }
         T rs;
         try {
+            // 执行
             rs = executor.execute(args);
         } catch (Throwable ex) {
             if (!(ex instanceof SQLException)) {

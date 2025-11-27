@@ -40,6 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 
 /**
+ * AT模式的资源管理器
  * The type Data source manager.
  *
  */
@@ -51,6 +52,15 @@ public class DataSourceManager extends AbstractResourceManager {
 
     private final Map<String, Resource> dataSourceCache = new ConcurrentHashMap<>();
 
+    /**
+     * 查询全局锁
+     * @param branchType the branch type
+     * @param resourceId the resource id
+     * @param xid        the xid
+     * @param lockKeys   the lock keys
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public boolean lockQuery(BranchType branchType, String resourceId, String xid, String lockKeys)
             throws TransactionException {
@@ -84,6 +94,10 @@ public class DataSourceManager extends AbstractResourceManager {
      */
     public DataSourceManager() {}
 
+    /**
+     * 注册数据源
+     * @param resource The resource to be managed.
+     */
     @Override
     public void registerResource(Resource resource) {
         DataSourceProxy dataSourceProxy = (DataSourceProxy) resource;
@@ -97,7 +111,7 @@ public class DataSourceManager extends AbstractResourceManager {
     }
 
     /**
-     * Get data source proxy.
+     * Get data source proxy. 获取数据源
      *
      * @param resourceId the resource id
      * @return the data source proxy
@@ -106,6 +120,16 @@ public class DataSourceManager extends AbstractResourceManager {
         return (DataSourceProxy) dataSourceCache.get(resourceId);
     }
 
+    /**
+     * 提交分支
+     * @param branchType      the branch type
+     * @param xid             Transaction id.
+     * @param branchId        Branch id.
+     * @param resourceId      Resource id.
+     * @param applicationData Application data bind with this branch.
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public BranchStatus branchCommit(
             BranchType branchType, String xid, long branchId, String resourceId, String applicationData)
@@ -113,6 +137,16 @@ public class DataSourceManager extends AbstractResourceManager {
         return asyncWorker.branchCommit(xid, branchId, resourceId);
     }
 
+    /**
+     * 回滚分支
+     * @param branchType      the branch type
+     * @param xid             Transaction id.
+     * @param branchId        Branch id.
+     * @param resourceId      Resource id.
+     * @param applicationData Application data bind with this branch.
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public BranchStatus branchRollback(
             BranchType branchType, String xid, long branchId, String resourceId, String applicationData)
@@ -122,6 +156,7 @@ public class DataSourceManager extends AbstractResourceManager {
             throw new ShouldNeverHappenException(String.format("resource: %s not found", resourceId));
         }
         try {
+            // 执行undoLog
             UndoLogManagerFactory.getUndoLogManager(dataSourceProxy.getDbType()).undo(dataSourceProxy, xid, branchId);
             if (LOGGER.isInfoEnabled()) {
                 LOGGER.info("branch rollback success, xid:{}, branchId:{}", xid, branchId);
