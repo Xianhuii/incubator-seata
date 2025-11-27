@@ -48,6 +48,7 @@ import java.util.function.Function;
 import static org.apache.seata.common.util.StringUtils.isNotBlank;
 
 /**
+ * 事务管理器（发起全局事务，请求TC）
  * The rm netty client.
  *
  */

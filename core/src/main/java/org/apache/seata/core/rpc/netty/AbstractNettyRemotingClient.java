@@ -664,6 +664,7 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
     }
 
     /**
+     * 处理远程消息
      * The type ClientHandler.
      */
     @Sharable

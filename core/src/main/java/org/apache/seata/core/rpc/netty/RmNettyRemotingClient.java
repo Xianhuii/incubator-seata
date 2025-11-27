@@ -53,6 +53,7 @@ import java.util.function.Function;
 import static org.apache.seata.common.Constants.DBKEYS_SPLIT_CHAR;
 
 /**
+ * 资源管理器客户端（请求TC & 监听TC请求）
  * The Rm netty client.
  *
  */
