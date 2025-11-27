@@ -280,7 +280,7 @@ public final class TmNettyRemotingClient extends AbstractNettyRemotingClient {
     }
 
     private void registerProcessor() {
-        // 1.registry TC response processor
+        // 1.registry TC response processor 事务协调器响应
         ClientOnResponseProcessor onResponseProcessor = new ClientOnResponseProcessor(
                 mergeMsgMap, super.getFutures(), childToParentMap, getTransactionMessageHandler());
         super.registerProcessor(MessageType.TYPE_SEATA_MERGE_RESULT, onResponseProcessor, null);
@@ -291,7 +291,7 @@ public final class TmNettyRemotingClient extends AbstractNettyRemotingClient {
         super.registerProcessor(MessageType.TYPE_GLOBAL_STATUS_RESULT, onResponseProcessor, null);
         super.registerProcessor(MessageType.TYPE_REG_CLT_RESULT, onResponseProcessor, null);
         super.registerProcessor(MessageType.TYPE_BATCH_RESULT_MSG, onResponseProcessor, null);
-        // 2.registry heartbeat message processor
+        // 2.registry heartbeat message processor 心跳
         ClientHeartbeatProcessor clientHeartbeatProcessor = new ClientHeartbeatProcessor();
         super.registerProcessor(MessageType.TYPE_HEARTBEAT_MSG, clientHeartbeatProcessor, null);
     }

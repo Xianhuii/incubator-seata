@@ -353,18 +353,18 @@ public final class RmNettyRemotingClient extends AbstractNettyRemotingClient {
     }
 
     private void registerProcessor() {
-        // 1.registry rm client handle branch commit processor
+        // 1.registry rm client handle branch commit processor 分支提交
         RmBranchCommitProcessor rmBranchCommitProcessor =
                 new RmBranchCommitProcessor(getTransactionMessageHandler(), this);
         super.registerProcessor(MessageType.TYPE_BRANCH_COMMIT, rmBranchCommitProcessor, messageExecutor);
-        // 2.registry rm client handle branch rollback processor
+        // 2.registry rm client handle branch rollback processor 分支回滚
         RmBranchRollbackProcessor rmBranchRollbackProcessor =
                 new RmBranchRollbackProcessor(getTransactionMessageHandler(), this);
         super.registerProcessor(MessageType.TYPE_BRANCH_ROLLBACK, rmBranchRollbackProcessor, messageExecutor);
-        // 3.registry rm handler undo log processor
+        // 3.registry rm handler undo log processor 删除undoLog
         RmUndoLogProcessor rmUndoLogProcessor = new RmUndoLogProcessor(getTransactionMessageHandler());
         super.registerProcessor(MessageType.TYPE_RM_DELETE_UNDOLOG, rmUndoLogProcessor, messageExecutor);
-        // 4.registry TC response processor
+        // 4.registry TC response processor 事务协调器响应
         ClientOnResponseProcessor onResponseProcessor = new ClientOnResponseProcessor(
                 mergeMsgMap, super.getFutures(), childToParentMap, getTransactionMessageHandler());
         super.registerProcessor(MessageType.TYPE_SEATA_MERGE_RESULT, onResponseProcessor, null);
@@ -373,7 +373,7 @@ public final class RmNettyRemotingClient extends AbstractNettyRemotingClient {
         super.registerProcessor(MessageType.TYPE_GLOBAL_LOCK_QUERY_RESULT, onResponseProcessor, null);
         super.registerProcessor(MessageType.TYPE_REG_RM_RESULT, onResponseProcessor, null);
         super.registerProcessor(MessageType.TYPE_BATCH_RESULT_MSG, onResponseProcessor, null);
-        // 5.registry heartbeat message processor
+        // 5.registry heartbeat message processor 心跳
         ClientHeartbeatProcessor clientHeartbeatProcessor = new ClientHeartbeatProcessor();
         super.registerProcessor(MessageType.TYPE_HEARTBEAT_MSG, clientHeartbeatProcessor, null);
     }
