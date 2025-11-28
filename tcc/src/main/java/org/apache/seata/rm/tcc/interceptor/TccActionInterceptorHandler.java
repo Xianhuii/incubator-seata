@@ -82,9 +82,10 @@ public class TccActionInterceptorHandler extends AbstractProxyInvocationHandler 
                 RootContext.bindBranchType(getBranchType());
             }
             try {
+                // 创建事务配置
                 TwoPhaseBusinessActionParam businessActionParam = createTwoPhaseBusinessActionParam(businessAction);
                 initTransactionalAnnotationContext(method, targetBean, businessActionParam.getBusinessActionContext());
-                // Handler the TCC Aspect, and return the business result
+                // Handler the TCC Aspect, and return the business result 执行TCC
                 return actionInterceptorHandler.proceed(
                         method, invocation.getArguments(), xid, businessActionParam, invocation::proceed);
             } finally {

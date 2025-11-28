@@ -22,6 +22,7 @@ import org.apache.seata.core.model.Resource;
 import java.lang.reflect.Method;
 
 /**
+ * TCC事务的资源，包含各个阶段的目标方法
  * The type Tcc resource.
  *
  */

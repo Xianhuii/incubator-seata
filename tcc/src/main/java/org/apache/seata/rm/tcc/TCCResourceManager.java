@@ -95,6 +95,7 @@ public class TCCResourceManager extends AbstractResourceManager {
         return tccResourceCache;
     }
     /**
+     * TCC分支提交：触发commitMethod方法
      * TCC branch commit
      *
      * @param branchType
@@ -172,6 +173,7 @@ public class TCCResourceManager extends AbstractResourceManager {
     }
 
     /**
+     * TCC分支回滚：触发rollbackMethod方法
      * TCC branch rollback
      *
      * @param branchType      the branch type

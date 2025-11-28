@@ -85,7 +85,7 @@ public class ActionInterceptorHandler {
         // Set branch type
         actionContext.setBranchType(businessActionParam.getBranchType());
 
-        // Creating Branch Record
+        // Creating Branch Record 注册分支
         String branchId = doTxActionLogStore(method, arguments, businessActionParam, actionContext);
         actionContext.setBranchId(branchId);
         // MDC put branchId
@@ -96,7 +96,9 @@ public class ActionInterceptorHandler {
         try {
             // share actionContext implicitly
             BusinessActionContextUtil.setContext(actionContext);
+            // 触发beforeTccPrepare回调
             doBeforeTccPrepare(xid, branchId, actionName, actionContext);
+            // 执行业务
             if (businessActionParam.getUseCommonFence()) {
                 try {
                     // Use common Fence, and return the business result
@@ -115,8 +117,10 @@ public class ActionInterceptorHandler {
             }
         } finally {
             try {
+                // 触发afterTccPrepare回调
                 doAfterTccPrepare(xid, branchId, actionName, actionContext);
                 // to report business action context finally if the actionContext.getUpdated() is true
+                // 上报分支执行结束
                 BusinessActionContextUtil.reportContext(actionContext);
             } finally {
                 if (previousActionContext != null) {
@@ -246,7 +250,7 @@ public class ActionInterceptorHandler {
         Map<String, Object> applicationContext = Collections.singletonMap(Constants.TX_ACTION_CONTEXT, context);
         String applicationContextStr = JsonUtil.toJSONString(applicationContext);
         try {
-            // registry branch record
+            // registry branch record 注册分支
             Long branchId = DefaultResourceManager.get()
                     .branchRegister(
                             businessActionParam.getBranchType(), actionName, null, xid, applicationContextStr, null);

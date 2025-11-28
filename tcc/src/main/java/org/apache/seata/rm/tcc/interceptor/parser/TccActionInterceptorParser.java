@@ -74,7 +74,7 @@ public class TccActionInterceptorParser implements InterfaceParser {
                 Annotation annotation = method.getAnnotation(getAnnotationClass());
                 if (annotation != null) {
                     Resource resource = createResource(target, methodClassEntry.getValue(), method, annotation);
-                    // registry resource
+                    // registry resource 注册资源
                     DefaultResourceManager.get().registerResource(resource);
                 }
             }
